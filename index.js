@@ -88,7 +88,17 @@ function hasStockChanged(products) {
 }
 
 async function run() {
-  const products = await fetchAllProducts();
+  let products;
+  try {
+    products = await fetchAllProducts();
+  } catch (e) {
+    console.error('[stock-notice] 拉取商品失败', e.message);
+    return;
+  }
+  if (products.length === 0) {
+    console.log('[stock-notice] 商品列表为空，跳过');
+    return;
+  }
   const currentMap = {};
   for (const p of products) currentMap[p.id] = getStock(p);
 
@@ -104,10 +114,14 @@ async function run() {
     console.log('[stock-notice] 库存无变化，跳过发送');
     return;
   }
-  const rows = buildProductRows(products);
-  const message = `<b>masta.ee 通知</b>\n\n检测到库存变化\n当前库存为`;
-  await sendTelegram(message, rows);
-  console.log('[stock-notice] 检测到库存变化，已发送', products.length, '个商品到 TG');
+  try {
+    const rows = buildProductRows(products);
+    const message = `<b>masta.ee 通知</b>\n\n检测到库存变化\n当前库存为`;
+    await sendTelegram(message, rows);
+    console.log('[stock-notice] 检测到库存变化，已发送', products.length, '个商品到 TG');
+  } catch (e) {
+    console.error('[stock-notice] 发送 TG 失败', e.message);
+  }
 }
 
 async function main() {
