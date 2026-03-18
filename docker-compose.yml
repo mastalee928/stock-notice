@@ -1,0 +1,14 @@
+# masta.ee 库存通知 -> Telegram 频道
+# 在 stock-notice 目录执行: cp .env.example .env 并填写后 docker compose up -d
+
+services:
+  stock-notice:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: stock-notice:latest
+    container_name: stock-notice
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - NODE_ENV=production

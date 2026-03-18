@@ -1,0 +1,127 @@
+require('dotenv').config();
+
+const SITE_URL = (process.env.SITE_URL || 'https://masta.ee').replace(/\/$/, '');
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+const INTERVAL_SECONDS = Math.max(5, Number(process.env.INTERVAL_SECONDS) || 5);
+
+const API_PRODUCTS = `${SITE_URL}/api/v1/public/products`;
+
+let lastStockMap = {}; // { productId: stock } 用于检测库存是否变化
+
+function getStock(p) {
+  return p.manual_stock_available ?? p.auto_stock_available ?? 0;
+}
+
+function pickTitle(obj) {
+  if (!obj || typeof obj !== 'object') return '';
+  return obj['zh-CN'] || obj['en'] || obj['zh'] || Object.values(obj)[0] || '';
+}
+
+async function fetchAllProducts() {
+  const list = [];
+  let page = 1;
+  const pageSize = 100;
+  while (true) {
+    const url = `${API_PRODUCTS}?page=${page}&page_size=${pageSize}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    const json = await res.json();
+    if (json.status_code !== 0 || !Array.isArray(json.data)) throw new Error(json.msg || 'API 返回异常');
+    list.push(...json.data);
+    const total = json.pagination?.total ?? list.length;
+    if (list.length >= total || json.data.length < pageSize) break;
+    page++;
+  }
+  return list;
+}
+
+function buildProductRows(products) {
+  return products.map((p) => {
+    const title = pickTitle(p.title) || p.slug || `#${p.id}`;
+    const price = p.promotion_price_amount ?? p.price_amount ?? '0';
+    const priceStr = typeof price === 'string' ? price : String(price);
+    const stock = getStock(p);
+    const text = `${title} - ¥ ${priceStr} - 剩余:${stock}`;
+    const url = `${SITE_URL}/products/${p.slug || p.id}`;
+    return [{ text, url }];
+  });
+}
+
+async function sendTelegram(message, inlineKeyboard) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.warn('未配置 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID，跳过发送');
+    return;
+  }
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const body = {
+    chat_id: TELEGRAM_CHAT_ID,
+    text: message,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  };
+  if (inlineKeyboard && inlineKeyboard.length) {
+    body.reply_markup = { inline_keyboard: inlineKeyboard };
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!data.ok) {
+    throw new Error(data.description || `Telegram API ${res.status}`);
+  }
+}
+
+function hasStockChanged(products) {
+  const current = {};
+  for (const p of products) current[p.id] = getStock(p);
+  const last = lastStockMap;
+  const lastKeys = Object.keys(last);
+  const currKeys = Object.keys(current);
+  if (lastKeys.length !== currKeys.length) return true;
+  for (const id of currKeys) {
+    if (Number(last[id]) !== Number(current[id])) return true;
+  }
+  return false;
+}
+
+async function run() {
+  const products = await fetchAllProducts();
+  const currentMap = {};
+  for (const p of products) currentMap[p.id] = getStock(p);
+
+  const isFirstRun = Object.keys(lastStockMap).length === 0;
+  const changed = hasStockChanged(products);
+  lastStockMap = currentMap;
+
+  if (isFirstRun) {
+    console.log('[stock-notice] 首次运行，已记录当前库存，下次变化时再通知');
+    return;
+  }
+  if (!changed) {
+    console.log('[stock-notice] 库存无变化，跳过发送');
+    return;
+  }
+  const rows = buildProductRows(products);
+  const message = `<b>masta.ee 通知</b>\n\n检测到库存变化\n当前库存为`;
+  await sendTelegram(message, rows);
+  console.log('[stock-notice] 检测到库存变化，已发送', products.length, '个商品到 TG');
+}
+
+async function main() {
+  if (process.argv.includes('--once')) {
+    await run();
+    process.exit(0);
+    return;
+  }
+  console.log('[stock-notice] 启动，间隔', INTERVAL_SECONDS, '秒，仅库存变化时发送，SITE_URL=', SITE_URL);
+  await run();
+  setInterval(run, INTERVAL_SECONDS * 1000);
+}
+
+main().catch((e) => {
+  console.error('[stock-notice]', e);
+  process.exit(1);
+});
