@@ -12,7 +12,7 @@
 git clone https://github.com/mastalee928/stock-notice.git && cd stock-notice && cp .env.example .env
 ```
 
-编辑 `.env`，填写 `SITE_URL`、`TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` 后，在项目根目录执行：
+编辑 `.env`，填写 `SITE_URL`、`TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID`（多频道用英文逗号分隔）后，在项目根目录执行：
 
 ```bash
 docker compose up -d --build
@@ -33,7 +33,7 @@ cd stock-notice
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填写 SITE_URL、TELEGRAM_BOT_TOKEN、TELEGRAM_CHAT_ID（必填），INTERVAL_SECONDS 可选，默认 5 秒
+# 编辑 .env，填写 SITE_URL、TELEGRAM_BOT_TOKEN、TELEGRAM_CHAT_ID（必填；多频道用英文逗号分隔），INTERVAL_SECONDS 可选，默认 5 秒
 ```
 
 **启动**
@@ -81,7 +81,7 @@ git pull && docker compose up -d --build
 |------|------|
 | `SITE_URL` | 店铺根地址，如 `https://masta.ee`（不要以 `/` 结尾） |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot Token（@BotFather 创建） |
-| `TELEGRAM_CHAT_ID` | 频道/群组 ID，如 `-1001234567890` |
+| `TELEGRAM_CHAT_ID` | 频道/群组 ID；多个频道用英文逗号分隔，如 `-1001234567890` 或 `-100111,-100222` |
 | `INTERVAL_SECONDS` | 轮询间隔（秒），默认 5；仅库存变化时发送通知 |
 
 获取 `TELEGRAM_CHAT_ID`：将 Bot 拉入频道/群组为管理员，向频道发一条消息，访问  

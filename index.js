@@ -2,7 +2,10 @@ require('dotenv').config();
 
 const SITE_URL = (process.env.SITE_URL || 'https://masta.ee').replace(/\/$/, '');
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+const TELEGRAM_CHAT_IDS = (process.env.TELEGRAM_CHAT_ID || '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
 const INTERVAL_SECONDS = Math.max(5, Number(process.env.INTERVAL_SECONDS) || 5);
 const NOTIFY_ON_FIRST_RUN = process.env.NOTIFY_ON_FIRST_RUN === '1' || process.env.NOTIFY_ON_FIRST_RUN === 'true';
 const NOTIFY_HEADER = process.env.NOTIFY_HEADER || 'masta.ee 通知';
@@ -65,13 +68,12 @@ function buildProductRows(products) {
 }
 
 async function sendTelegram(message, inlineKeyboard) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+  if (!TELEGRAM_BOT_TOKEN || TELEGRAM_CHAT_IDS.length === 0) {
     console.warn('未配置 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID，跳过发送');
     return;
   }
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const body = {
-    chat_id: TELEGRAM_CHAT_ID,
     text: message,
     parse_mode: 'HTML',
     disable_web_page_preview: true,
@@ -79,14 +81,18 @@ async function sendTelegram(message, inlineKeyboard) {
   if (inlineKeyboard && inlineKeyboard.length) {
     body.reply_markup = { inline_keyboard: inlineKeyboard };
   }
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!data.ok) {
-    throw new Error(data.description || `Telegram API ${res.status}`);
+  const results = await Promise.all(
+    TELEGRAM_CHAT_IDS.map((chat_id) =>
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, chat_id }),
+      }).then((res) => res.json().catch(() => ({})))
+    )
+  );
+  const failed = results.filter((r) => !r.ok);
+  if (failed.length) {
+    throw new Error(failed.map((r) => r.description || 'Unknown').join('; '));
   }
 }
 
@@ -152,7 +158,7 @@ async function main() {
     process.exit(0);
     return;
   }
-  const tgOk = !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID);
+  const tgOk = !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_IDS.length > 0);
   console.log('[stock-notice] 启动，间隔', INTERVAL_SECONDS, '秒，SITE_URL=', SITE_URL, '，TG 配置:', tgOk ? '已配置' : '未配置（不会发消息）');
   if (!tgOk) console.warn('[stock-notice] 请设置 TELEGRAM_BOT_TOKEN 与 TELEGRAM_CHAT_ID（频道需把 Bot 加为管理员）');
   if (tgOk && NOTIFY_ON_FIRST_RUN) console.log('[stock-notice] NOTIFY_ON_FIRST_RUN=1，首次运行会发一条当前库存');
