@@ -5,6 +5,10 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 const INTERVAL_SECONDS = Math.max(5, Number(process.env.INTERVAL_SECONDS) || 5);
 const NOTIFY_ON_FIRST_RUN = process.env.NOTIFY_ON_FIRST_RUN === '1' || process.env.NOTIFY_ON_FIRST_RUN === 'true';
+const NOTIFY_HEADER = process.env.NOTIFY_HEADER || 'masta.ee 通知';
+const NOTIFY_FIRST_TITLE = process.env.NOTIFY_FIRST_TITLE || '当前库存';
+const NOTIFY_CHANGE_TITLE = process.env.NOTIFY_CHANGE_TITLE || '检测到库存变化';
+const NOTIFY_SUBTITLE = process.env.NOTIFY_SUBTITLE || '当前库存为';
 
 const API_PRODUCTS = `${SITE_URL}/api/v1/public/products`;
 
@@ -128,8 +132,8 @@ async function run() {
   }
   try {
     const rows = buildProductRows(products);
-    const title = isFirstRun ? '当前库存' : '检测到库存变化';
-    const message = `<b>masta.ee 通知</b>\n\n${title}\n当前库存为`;
+    const title = isFirstRun ? NOTIFY_FIRST_TITLE : NOTIFY_CHANGE_TITLE;
+    const message = `<b>${NOTIFY_HEADER}</b>\n\n${title}\n${NOTIFY_SUBTITLE}`;
     await sendTelegram(message, rows);
     console.log('[stock-notice] 已发送', products.length, '个商品到 TG');
   } catch (e) {
