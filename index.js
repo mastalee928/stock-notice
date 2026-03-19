@@ -10,8 +10,19 @@ const API_PRODUCTS = `${SITE_URL}/api/v1/public/products`;
 
 let lastStockMap = {}; // { productId: stock } 用于检测库存是否变化
 
+/** 取商品可用库存（-1 表示无限，由 display 层显示为「无限」） */
 function getStock(p) {
-  return p.manual_stock_available ?? p.auto_stock_available ?? 0;
+  const isManual = p.fulfillment_type === 'manual';
+  const n = isManual
+    ? (p.manual_stock_available ?? -1)
+    : (p.auto_stock_available ?? 0);
+  return n;
+}
+
+/** 用于展示：-1 显示为 ∞ */
+function getStockDisplay(p) {
+  const n = getStock(p);
+  return n === -1 ? '∞' : String(n);
 }
 
 function pickTitle(obj) {
@@ -42,8 +53,8 @@ function buildProductRows(products) {
     const title = pickTitle(p.title) || p.slug || `#${p.id}`;
     const price = p.promotion_price_amount ?? p.price_amount ?? '0';
     const priceStr = typeof price === 'string' ? price : String(price);
-    const stock = getStock(p);
-    const text = `${title} - ¥ ${priceStr} - 剩余:${stock}`;
+    const stockStr = getStockDisplay(p);
+    const text = `${title} - ¥ ${priceStr} - 剩余:${stockStr}`;
     const url = `${SITE_URL}/products/${p.slug || p.id}`;
     return [{ text, url }];
   });
