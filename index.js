@@ -4,6 +4,7 @@ const SITE_URL = (process.env.SITE_URL || 'https://masta.ee').replace(/\/$/, '')
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 const INTERVAL_SECONDS = Math.max(5, Number(process.env.INTERVAL_SECONDS) || 5);
+const NOTIFY_ON_FIRST_RUN = process.env.NOTIFY_ON_FIRST_RUN === '1' || process.env.NOTIFY_ON_FIRST_RUN === 'true';
 
 const API_PRODUCTS = `${SITE_URL}/api/v1/public/products`;
 
@@ -106,19 +107,20 @@ async function run() {
   const changed = hasStockChanged(products);
   lastStockMap = currentMap;
 
-  if (isFirstRun) {
-    console.log('[stock-notice] 首次运行，已记录当前库存，下次变化时再通知');
+  if (isFirstRun && !NOTIFY_ON_FIRST_RUN) {
+    console.log('[stock-notice] 首次运行，已记录当前库存，下次变化时再通知（设 NOTIFY_ON_FIRST_RUN=1 可首次也发一条）');
     return;
   }
-  if (!changed) {
+  if (!isFirstRun && !changed) {
     console.log('[stock-notice] 库存无变化，跳过发送');
     return;
   }
   try {
     const rows = buildProductRows(products);
-    const message = `<b>masta.ee 通知</b>\n\n检测到库存变化\n当前库存为`;
+    const title = isFirstRun ? '当前库存' : '检测到库存变化';
+    const message = `<b>masta.ee 通知</b>\n\n${title}\n当前库存为`;
     await sendTelegram(message, rows);
-    console.log('[stock-notice] 检测到库存变化，已发送', products.length, '个商品到 TG');
+    console.log('[stock-notice] 已发送', products.length, '个商品到 TG');
   } catch (e) {
     console.error('[stock-notice] 发送 TG 失败', e.message);
   }
@@ -130,7 +132,10 @@ async function main() {
     process.exit(0);
     return;
   }
-  console.log('[stock-notice] 启动，间隔', INTERVAL_SECONDS, '秒，仅库存变化时发送，SITE_URL=', SITE_URL);
+  const tgOk = !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID);
+  console.log('[stock-notice] 启动，间隔', INTERVAL_SECONDS, '秒，SITE_URL=', SITE_URL, '，TG 配置:', tgOk ? '已配置' : '未配置（不会发消息）');
+  if (!tgOk) console.warn('[stock-notice] 请设置 TELEGRAM_BOT_TOKEN 与 TELEGRAM_CHAT_ID（频道需把 Bot 加为管理员）');
+  if (tgOk && NOTIFY_ON_FIRST_RUN) console.log('[stock-notice] NOTIFY_ON_FIRST_RUN=1，首次运行会发一条当前库存');
   await run();
   setInterval(run, INTERVAL_SECONDS * 1000);
 }
