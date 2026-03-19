@@ -10,6 +10,7 @@ const INTERVAL_SECONDS = Math.max(5, Number(process.env.INTERVAL_SECONDS) || 5);
 const NOTIFY_ON_FIRST_RUN = process.env.NOTIFY_ON_FIRST_RUN === '1' || process.env.NOTIFY_ON_FIRST_RUN === 'true';
 const NOTIFY_HEADER = process.env.NOTIFY_HEADER || 'masta.ee 通知';
 const NOTIFY_FIRST_TITLE = process.env.NOTIFY_FIRST_TITLE || '当前库存';
+const NOTIFY_SECOND_TITLE = process.env.NOTIFY_SECOND_TITLE || '';
 const NOTIFY_CHANGE_TITLE = process.env.NOTIFY_CHANGE_TITLE || '检测到库存变化';
 const NOTIFY_SUBTITLE = process.env.NOTIFY_SUBTITLE || '当前库存为';
 
@@ -142,6 +143,7 @@ async function run() {
     const parts = [
       NOTIFY_HEADER.trim() ? `<b>${NOTIFY_HEADER}</b>` : '',
       title.trim(),
+      NOTIFY_SECOND_TITLE.trim(),
       NOTIFY_SUBTITLE.trim(),
     ].filter((s) => String(s).trim() !== '');
     const message = parts.join('\n\n');
