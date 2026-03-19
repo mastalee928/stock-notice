@@ -133,7 +133,12 @@ async function run() {
   try {
     const rows = buildProductRows(products);
     const title = isFirstRun ? NOTIFY_FIRST_TITLE : NOTIFY_CHANGE_TITLE;
-    const message = `<b>${NOTIFY_HEADER}</b>\n\n${title}\n${NOTIFY_SUBTITLE}`;
+    const parts = [
+      NOTIFY_HEADER.trim() ? `<b>${NOTIFY_HEADER}</b>` : '',
+      title.trim(),
+      NOTIFY_SUBTITLE.trim(),
+    ].filter((s) => String(s).trim() !== '');
+    const message = parts.join('\n\n');
     await sendTelegram(message, rows);
     console.log('[stock-notice] 已发送', products.length, '个商品到 TG');
   } catch (e) {
