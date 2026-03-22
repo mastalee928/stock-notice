@@ -5,8 +5,6 @@
 - **可售为 0** 且有预占：**`库存:占用×n`**（或 `stock_status=occupied`）。  
 - **可售仍 &gt; 0** 但有预占：**`可用:1·预占×1`**，避免只看到数字从 2 变 1、看不出有人未付占库存。
 
-若始终没有「预占×」后缀，请到 `SITE_URL/api/v1/public/products` 看该商品的 `auto_stock_locked` / `manual_stock_locked` 是否为 0。
-
 **仅提供 Docker 部署，在 Linux 服务器上运行。**
 
 上游仓库：<https://github.com/mastalee928/stock-notice>
