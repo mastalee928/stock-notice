@@ -1,6 +1,6 @@
 {
   "name": "stock-notice",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "masta.ee 库存监控并推送至 Telegram 频道",
   "main": "index.js",
   "scripts": {

@@ -37,6 +37,19 @@ function getLockedCount(p) {
   return Number(p.auto_stock_locked) || 0;
 }
 
+/**
+ * 是否为「可售为 0 但被未支付订单预占」（不应显示成普通售罄的「剩余:0」）。
+ * 说明：很多店铺未改后端时不会返回 stock_status=occupied，但 public API 仍会带
+ * auto_stock_locked / manual_stock_locked，故用数量推断。
+ */
+function isStockOccupied(p) {
+  if (p.stock_status === 'occupied') return true;
+  const n = getStock(p);
+  if (n === -1) return false; // 人工无限库存
+  if (n > 0) return false;
+  return getLockedCount(p) > 0;
+}
+
 /** 单商品状态签名（变化检测） */
 function getProductStateSignature(p) {
   const stock = getStock(p);
@@ -47,10 +60,10 @@ function getProductStateSignature(p) {
 
 /**
  * 按钮文案里的库存描述。
- * Dujiao-Next 在仅有未支付预占时可能返回 stock_status=occupied，避免显示成「剩余:0」像售罄。
+ * 有预占时显示占用×n，避免与真缺货的「剩余:0」混淆。
  */
 function getStockDisplay(p) {
-  if (p.stock_status === 'occupied') {
+  if (isStockOccupied(p)) {
     const locked = getLockedCount(p);
     return locked > 0 ? `占用×${locked}` : '占用';
   }
@@ -87,7 +100,7 @@ function buildProductRows(products) {
     const price = p.promotion_price_amount ?? p.price_amount ?? '0';
     const priceStr = typeof price === 'string' ? price : String(price);
     const stockStr = getStockDisplay(p);
-    const label = p.stock_status === 'occupied' ? '库存' : '剩余';
+    const label = isStockOccupied(p) ? '库存' : '剩余';
     const text = `${title} - ¥ ${priceStr} - ${label}:${stockStr}`;
     const url = `${SITE_URL}/products/${p.slug || p.id}`;
     return [{ text, url }];
