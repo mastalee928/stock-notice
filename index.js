@@ -16,7 +16,8 @@ const NOTIFY_SUBTITLE = process.env.NOTIFY_SUBTITLE || '当前库存为';
 
 const API_PRODUCTS = `${SITE_URL}/api/v1/public/products`;
 
-let lastStockMap = {}; // { productId: stock } 用于检测库存是否变化
+/** 用于对比「是否有变化」：除可用数外含 stock_status、预占量（避免 售罄↔占用 时数字同为 0 漏报） */
+let lastProductStateMap = {};
 
 /** 取商品可用库存（-1 表示无限，由 display 层显示为「无限」） */
 function getStock(p) {
@@ -27,8 +28,32 @@ function getStock(p) {
   return n;
 }
 
-/** 用于展示：-1 显示为 ∞ */
+/** 预占数量（待支付），用于 occupied 展示与签名 */
+function getLockedCount(p) {
+  const isManual = p.fulfillment_type === 'manual';
+  if (isManual) {
+    return Number(p.manual_stock_locked) || 0;
+  }
+  return Number(p.auto_stock_locked) || 0;
+}
+
+/** 单商品状态签名（变化检测） */
+function getProductStateSignature(p) {
+  const stock = getStock(p);
+  const status = typeof p.stock_status === 'string' ? p.stock_status : '';
+  const locked = getLockedCount(p);
+  return `${stock}|${status}|${locked}`;
+}
+
+/**
+ * 按钮文案里的库存描述。
+ * Dujiao-Next 在仅有未支付预占时可能返回 stock_status=occupied，避免显示成「剩余:0」像售罄。
+ */
 function getStockDisplay(p) {
+  if (p.stock_status === 'occupied') {
+    const locked = getLockedCount(p);
+    return locked > 0 ? `占用×${locked}` : '占用';
+  }
   const n = getStock(p);
   return n === -1 ? '∞' : String(n);
 }
@@ -62,7 +87,8 @@ function buildProductRows(products) {
     const price = p.promotion_price_amount ?? p.price_amount ?? '0';
     const priceStr = typeof price === 'string' ? price : String(price);
     const stockStr = getStockDisplay(p);
-    const text = `${title} - ¥ ${priceStr} - 剩余:${stockStr}`;
+    const label = p.stock_status === 'occupied' ? '库存' : '剩余';
+    const text = `${title} - ¥ ${priceStr} - ${label}:${stockStr}`;
     const url = `${SITE_URL}/products/${p.slug || p.id}`;
     return [{ text, url }];
   });
@@ -97,15 +123,15 @@ async function sendTelegram(message, inlineKeyboard) {
   }
 }
 
-function hasStockChanged(products) {
+function hasProductStateChanged(products) {
   const current = {};
-  for (const p of products) current[p.id] = getStock(p);
-  const last = lastStockMap;
+  for (const p of products) current[p.id] = getProductStateSignature(p);
+  const last = lastProductStateMap;
   const lastKeys = Object.keys(last);
   const currKeys = Object.keys(current);
   if (lastKeys.length !== currKeys.length) return true;
   for (const id of currKeys) {
-    if (Number(last[id]) !== Number(current[id])) return true;
+    if (last[id] !== current[id]) return true;
   }
   return false;
 }
@@ -123,11 +149,11 @@ async function run() {
     return;
   }
   const currentMap = {};
-  for (const p of products) currentMap[p.id] = getStock(p);
+  for (const p of products) currentMap[p.id] = getProductStateSignature(p);
 
-  const isFirstRun = Object.keys(lastStockMap).length === 0;
-  const changed = hasStockChanged(products);
-  lastStockMap = currentMap;
+  const isFirstRun = Object.keys(lastProductStateMap).length === 0;
+  const changed = hasProductStateChanged(products);
+  lastProductStateMap = currentMap;
 
   if (isFirstRun && !NOTIFY_ON_FIRST_RUN) {
     console.log('[stock-notice] 首次运行，已记录当前库存，下次变化时再通知（设 NOTIFY_ON_FIRST_RUN=1 可首次也发一条）');
@@ -141,7 +167,7 @@ async function run() {
     const rows = buildProductRows(products);
     const title = isFirstRun ? NOTIFY_FIRST_TITLE : NOTIFY_CHANGE_TITLE;
     const parts = [
-      NOTIFY_HEADER.trim() ? `<b>${NOTIFY_HEADER}</b>` : '',
+      NOTIFY_HEADER.trim() ? ` ${NOTIFY_HEADER} ` : '',
       title.trim(),
       NOTIFY_SECOND_TITLE.trim(),
       NOTIFY_SUBTITLE.trim(),
