@@ -1,9 +1,9 @@
 # stock-notice
 
-从 masta.ee（Dujiao-Next 店铺）拉取商品列表与库存，**每 5 秒检查一次**；**仅当检测到库存变化时**推送到 Telegram 频道，消息带 inline 按钮（商品名 - 价格 - 剩余库存，点击跳转商品页）。
+从 masta.ee（Dujiao-Next 店铺）拉取商品列表与库存，**每 5 秒检查一次**；**仅当检测到库存变化时**推送到 Telegram 频道，消息带 inline 按钮（商品名 - 价格 - 可用库存，点击跳转商品页）。
 
 - **可售为 0** 且有预占：**`库存:占用×n`**（或 `stock_status=occupied`）。  
-- **可售仍 &gt; 0** 但有预占：**`剩余:1·预占×1`**，避免只看到数字从 2 变 1、看不出有人未付占库存。
+- **可售仍 &gt; 0** 但有预占：**`可用:1·预占×1`**，避免只看到数字从 2 变 1、看不出有人未付占库存。
 
 若始终没有「预占×」后缀，请到 `SITE_URL/api/v1/public/products` 看该商品的 `auto_stock_locked` / `manual_stock_locked` 是否为 0。
 

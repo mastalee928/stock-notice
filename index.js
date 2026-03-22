@@ -38,7 +38,7 @@ function getLockedCount(p) {
 }
 
 /**
- * 是否「可售为 0 且应标成占用/库存」——用「库存:」前缀，避免像普通「剩余:0」售罄。
+ * 是否「可售为 0 且应标成占用/库存」——用「库存:」前缀，避免像普通「可用:0」售罄。
  */
 function isOnlyLockedNoAvailable(p) {
   const n = getStock(p);
@@ -47,9 +47,9 @@ function isOnlyLockedNoAvailable(p) {
   return locked > 0 || p.stock_status === 'occupied';
 }
 
-/** 按钮前缀：全无可售且存在预占时用「库存」，否则「剩余」 */
+/** 按钮前缀：全无可售且存在预占时用「库存」，否则「可用」 */
 function getStockLabelForRow(p) {
-  return isOnlyLockedNoAvailable(p) ? '库存' : '剩余';
+  return isOnlyLockedNoAvailable(p) ? '库存' : '可用';
 }
 
 /** 单商品状态签名（变化检测） */
@@ -62,7 +62,7 @@ function getProductStateSignature(p) {
 
 /**
  * 按钮文案里的库存描述。
- * - 可售>0 但有预占：剩余:1·预占×1（避免只看到数字减 1 不知道有人未付占着）
+ * - 可售>0 但有预占：可用:1·预占×1（避免只看到数字减 1 不知道有人未付占着）
  * - 可售=0 有预占：占用×n（配合标签「库存:」）
  */
 function getStockDisplay(p) {
