@@ -38,16 +38,18 @@ function getLockedCount(p) {
 }
 
 /**
- * 是否为「可售为 0 但被未支付订单预占」（不应显示成普通售罄的「剩余:0」）。
- * 说明：很多店铺未改后端时不会返回 stock_status=occupied，但 public API 仍会带
- * auto_stock_locked / manual_stock_locked，故用数量推断。
+ * 是否「可售为 0 且应标成占用/库存」——用「库存:」前缀，避免像普通「剩余:0」售罄。
  */
-function isStockOccupied(p) {
-  if (p.stock_status === 'occupied') return true;
+function isOnlyLockedNoAvailable(p) {
   const n = getStock(p);
-  if (n === -1) return false; // 人工无限库存
-  if (n > 0) return false;
-  return getLockedCount(p) > 0;
+  if (n === -1 || n > 0) return false;
+  const locked = getLockedCount(p);
+  return locked > 0 || p.stock_status === 'occupied';
+}
+
+/** 按钮前缀：全无可售且存在预占时用「库存」，否则「剩余」 */
+function getStockLabelForRow(p) {
+  return isOnlyLockedNoAvailable(p) ? '库存' : '剩余';
 }
 
 /** 单商品状态签名（变化检测） */
@@ -60,15 +62,25 @@ function getProductStateSignature(p) {
 
 /**
  * 按钮文案里的库存描述。
- * 有预占时显示占用×n，避免与真缺货的「剩余:0」混淆。
+ * - 可售>0 但有预占：剩余:1·预占×1（避免只看到数字减 1 不知道有人未付占着）
+ * - 可售=0 有预占：占用×n（配合标签「库存:」）
  */
 function getStockDisplay(p) {
-  if (isStockOccupied(p)) {
-    const locked = getLockedCount(p);
+  const n = getStock(p);
+  const locked = getLockedCount(p);
+
+  if (n === -1) {
+    if (locked > 0) return `∞·预占×${locked}`;
+    return '∞';
+  }
+
+  if (n <= 0 && (locked > 0 || p.stock_status === 'occupied')) {
     return locked > 0 ? `占用×${locked}` : '占用';
   }
-  const n = getStock(p);
-  return n === -1 ? '∞' : String(n);
+  if (n > 0 && locked > 0) {
+    return `${n}·预占×${locked}`;
+  }
+  return String(n);
 }
 
 function pickTitle(obj) {
@@ -100,7 +112,7 @@ function buildProductRows(products) {
     const price = p.promotion_price_amount ?? p.price_amount ?? '0';
     const priceStr = typeof price === 'string' ? price : String(price);
     const stockStr = getStockDisplay(p);
-    const label = isStockOccupied(p) ? '库存' : '剩余';
+    const label = getStockLabelForRow(p);
     const text = `${title} - ¥ ${priceStr} - ${label}:${stockStr}`;
     const url = `${SITE_URL}/products/${p.slug || p.id}`;
     return [{ text, url }];
